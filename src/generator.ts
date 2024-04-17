@@ -62,10 +62,10 @@ ${convertToParam(name, attributes)}`;
 };
 
 export const generateSchemaTypes = (schema: SchemaResponse) => {
-  schema.Resources.forEach((resource) => {
+  const codes = schema.Resources.map((resource) => {
     const { name, attributes } = resource;
-    const id = name ?? resource.id.split(':').pop()!;
-    // どっかに書き込む
-    console.log(generateType(id, attributes));
+    const schemaName = name ?? resource.id.split(':').pop()!;
+    return { name: schemaName, code: generateType(schemaName, attributes) };
   });
+  return codes;
 };
