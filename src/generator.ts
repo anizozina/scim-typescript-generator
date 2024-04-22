@@ -1,21 +1,8 @@
-import { SchemaAttribute, SchemaResponse } from './types';
+import { Schema, SchemaAttribute } from './types';
 
 const toPascalCase = (name: string) => {
   const [first, ...rest] = name;
   return `${first.toUpperCase()}${rest.join('')}`;
-};
-
-// 最初に必要なtypeを全部作っちゃってから型の名前突っ込むようにしますか。
-const findComplexType = (attributes: SchemaAttribute[]) => {
-  const result: { name: string; attributes: SchemaAttribute[] }[] = [];
-  attributes.forEach((attribute) => {
-    if (attribute.type === 'complex') {
-      const subAttributes = attribute.subAttributes;
-      result.push({ name: attribute.name, attributes: subAttributes! });
-      result.push(...findComplexType(subAttributes!));
-    }
-  });
-  return result;
 };
 
 const toType = (attribute: SchemaAttribute) => {
@@ -31,38 +18,57 @@ const toType = (attribute: SchemaAttribute) => {
       return 'Date';
     case 'reference':
       return attribute.referenceTypes; // どう変換したものか...。
-    case 'complex':
-      return toPascalCase(attribute.name);
+    case 'complex': {
+      const subAttributes: SchemaAttribute[] = (() => {
+        const propertyName = (() => {
+          if ('subAttributes' in attribute) {
+            return 'subAttributes';
+            // for group in user schema in slack
+          } else if ('subattributes' in attribute) {
+            return 'subattributes';
+          }
+          return '';
+        })();
+        const value = attribute[propertyName as 'subAttributes'];
+        if (!value) return [];
+        if (Array.isArray(value)) {
+          return value;
+        }
+        return [value];
+      })();
+      return `{${toProperty(subAttributes)}}`;
+    }
   }
+};
+
+const toProperty = (attributes: SchemaAttribute[]): string => {
+  return attributes
+    .map((attribute) => {
+      const { name, required, multiValued } = attribute;
+      const type = toType(attribute);
+
+      return `"${name}"${required ? '' : '?'}: ${type}${
+        multiValued ? '[]' : ''
+      };`;
+    })
+    .join('\n');
 };
 
 const convertToParam = (name: string, attributes: SchemaAttribute[]) => {
   return `export type ${toPascalCase(name)} = {
-    ${attributes
-      .map((attribute) => {
-        const { name, required, multiValued } = attribute;
-        const type = toType(attribute);
-        return `${name}${required ? '' : '?'}: ${type}${
-          multiValued ? '[]' : ''
-        };`;
-      })
-      .join('\n')}
+    ${toProperty(attributes)}
 }
 `;
 };
 
 const generateType = (name: string, attributes: SchemaAttribute[]) => {
-  const complexType = findComplexType(attributes);
-  const types = complexType.map(({ name, attributes }) =>
-    convertToParam(name, attributes)
-  );
-  const result = `${types.join('')}
+  const result = `
 ${convertToParam(name, attributes)}`;
   return result;
 };
 
-export const generateSchemaTypes = (schema: SchemaResponse) => {
-  const codes = schema.Resources.map((resource) => {
+export const generateSchemaTypes = (schemas: Schema[]) => {
+  const codes = schemas.map((resource) => {
     const { name, attributes } = resource;
     const schemaName = name ?? resource.id.split(':').pop()!;
     return { name: schemaName, code: generateType(schemaName, attributes) };
