@@ -1,10 +1,10 @@
-import { loadSchema } from './client';
+import { Client } from './client';
 import { exportCodeToFile } from './exporter';
 import { applyCodeFormat } from './format';
 import { generateSchemaTypes } from './generator';
 
 (async () => {
-  const schemas = await loadSchema();
+  const schemas = await Client.setup('https://api.slack.com/scim/v1').loadSchema();
   const codes = await generateSchemaTypes(schemas);
 
   const formatCodes = await Promise.all(
