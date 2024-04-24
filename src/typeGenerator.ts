@@ -67,10 +67,10 @@ const generateType = (name: string, attributes: SchemaAttribute[]) => {
   return result;
 };
 
-export const generateSchemaTypes = (schemas: Schema[]) => {
+export const generateSchemaTypes = (systemName: string, schemas: Schema[]) => {
   const codes = schemas.map((resource) => {
     const { name, attributes } = resource;
-    const schemaName = name ?? resource.id.split(':').pop()!;
+    const schemaName = toPascalCase(`${systemName}${toPascalCase(name ?? resource.id.split(':').pop()!)}`);
     return {
       name: schemaName,
       code: [
